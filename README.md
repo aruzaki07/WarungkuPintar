@@ -1,10 +1,9 @@
-# umkm_smart_assistant
+# WarungkuPintar
 
-A new Flutter project.
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+WarungkuPintar merupakan sebuah solusi yang di ciptakan untuk umkm terutama pemilik warung kelontong yang ingin memiliki sebuah sistem manajemen untuk usahanya, WarungkuPintar hadir untuk memenuhi kebuttuhan tersebut dengan fitur pengelolaan stok yang mengkategorikannya secara otomatis, kasir dengan barcode mengunakan perangkat mobile maupun diinput manual, laporan penjualan, serta analisa stok kirisi dan kapan habis nya. WarungkuPintar di dukung penuh oleh kecerdasan buatan yang membuat aplikasi menjadi pintar.
 
 A few resources to get you started if this is your first Flutter project:
 
