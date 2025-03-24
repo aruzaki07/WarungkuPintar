@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:lottie/lottie.dart'; // Opsional, buat animasi loading
+import 'cashier_login_screen.dart';
+import 'cashier_screen.dart';
 import 'register_screen.dart';
 import 'main_screen.dart'; // Impor MainScreen buat navigasi
 
@@ -25,6 +27,7 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   void initState() {
     super.initState();
+    _checkCashierLogin(); // Tambah pengecekan login kasir
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
@@ -32,6 +35,19 @@ class _LoginScreenState extends State<LoginScreen>
     _animation =
         CurvedAnimation(parent: _animationController, curve: Curves.easeInOut);
     _animationController.forward();
+  }
+
+  Future<void> _checkCashierLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cashierId = prefs.getString('cashier_id');
+    if (cashierId != null) {
+      // Jika kasir sudah login, langsung ke CashierScreen
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const CashierScreen()),
+        (Route<dynamic> route) => false,
+      );
+    }
   }
 
   @override
@@ -268,6 +284,41 @@ class _LoginScreenState extends State<LoginScreen>
                               },
                               child: Text(
                                 'Belum punya akun? Daftar',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.green,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  PageRouteBuilder(
+                                    pageBuilder: (context, animation,
+                                            secondaryAnimation) =>
+                                        const CashierLoginScreen(),
+                                    transitionsBuilder: (context, animation,
+                                        secondaryAnimation, child) {
+                                      const begin = Offset(1.0, 0.0);
+                                      const end = Offset.zero;
+                                      const curve = Curves.easeInOut;
+                                      var tween = Tween(begin: begin, end: end)
+                                          .chain(CurveTween(curve: curve));
+                                      var offsetAnimation =
+                                          animation.drive(tween);
+                                      return SlideTransition(
+                                        position: offsetAnimation,
+                                        child: child,
+                                      );
+                                    },
+                                  ),
+                                );
+                              },
+                              child: Text(
+                                'Login sebagai Kasir',
                                 style: GoogleFonts.poppins(
                                   color: Colors.green,
                                   fontSize: 16,

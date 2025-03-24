@@ -42,6 +42,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   void initState() {
     super.initState();
     final provider = Provider.of<InventoryProvider>(context, listen: false);
+
     provider.loadItems();
     provider.loadSales();
     _nameController.addListener(_onNameChanged);

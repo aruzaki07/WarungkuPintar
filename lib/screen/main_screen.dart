@@ -3,10 +3,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:umkm_smart_assistant/screen/sales_screen.dart';
 import '../provider/inventory_provider.dart';
 import 'home_screen.dart';
 import 'inventory_screen.dart';
 import 'login_screen.dart';
+import 'manage_cashiers_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -21,6 +23,7 @@ class _MainScreenState extends State<MainScreen> {
   static const List<Widget> _screens = [
     HomeScreen(),
     InventoryScreen(),
+    SalesScreen(),
   ];
 
   void _onItemTapped(int index) {
@@ -54,7 +57,9 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: Padding(
-          padding: const EdgeInsets.only(left: 7.0, right: 2.0, top: 7.0, bottom: 7.0), // Margin di semua sisi (8.0 adalah contoh, bisa disesuaikan)
+          padding: const EdgeInsets.only(
+              left: 7.0, right: 2.0, top: 7.0, bottom: 7.0),
+          // Margin di semua sisi (8.0 adalah contoh, bisa disesuaikan)
           child: ClipRRect(
             borderRadius: BorderRadius.circular(50),
             child: Image.asset(
@@ -66,8 +71,7 @@ class _MainScreenState extends State<MainScreen> {
                 return const CircleAvatar(
                   radius: 50,
                   backgroundColor: Colors.black,
-                  child: Icon(Icons.store,
-                      size: 50, color: Colors.white),
+                  child: Icon(Icons.store, size: 50, color: Colors.white),
                 );
               },
             ),
@@ -103,12 +107,27 @@ class _MainScreenState extends State<MainScreen> {
             ),
           ),
         ),
-        elevation: 4, // Tambah elevation untuk efek shadow yang lebih menonjol
+        elevation: 4,
+        // Tambah elevation untuk efek shadow yang lebih menonjol
         actions: [
           IconButton(
             icon: const Icon(
-              Icons.logout,
-              color: Colors.white, // Ubah warna ikon menjadi putih agar kontras
+              Icons.person_add,
+              color: Colors.yellow,
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const ManageCashiersScreen()),
+              );
+            },
+            tooltip: 'Kelola Akun Kasir',
+          ),
+          IconButton(
+            icon: const Icon(
+              Icons.exit_to_app,
+              color: Colors.red, // Ubah warna ikon menjadi putih agar kontras
             ),
             tooltip: 'Logout',
             onPressed: _logout,
@@ -127,6 +146,10 @@ class _MainScreenState extends State<MainScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.inventory),
             label: 'Inventory',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.money),
+            label: 'Sales',
           ),
         ],
         currentIndex: _selectedIndex,

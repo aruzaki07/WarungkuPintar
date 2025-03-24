@@ -11,6 +11,7 @@ class Item {
   final String? stockPrediction;
   final String? imageUrl;
   final String? unit; // Tambah field buat satuan (contoh: "Liter (L)", "Kilogram (kg)", "Pcs/Buah")
+  // final String? barcodePath;
 
   Item({
     this.docId,
@@ -24,6 +25,7 @@ class Item {
     this.stockPrediction,
     this.imageUrl,
     this.unit, // Tambah parameter unit
+    // this.barcodePath,
   });
 
   Map<String, dynamic> toMap() {
@@ -38,6 +40,7 @@ class Item {
       'stock_prediction': stockPrediction,
       'image_url': imageUrl,
       'unit': unit ?? 'Pcs/Buah', // Default ke "Pcs/Buah" kalau null
+      // 'barcode_path': barcodePath,
     };
   }
 
@@ -54,6 +57,7 @@ class Item {
       stockPrediction: map['stock_prediction'] as String?,
       imageUrl: map['image_url'] as String?,
       unit: map['unit'] as String?, // Ambil satuan dari Firestore
+      // barcodePath: map['barcode_path'] as String?,
     );
   }
 }

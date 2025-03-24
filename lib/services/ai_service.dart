@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 
 class AIService {
   static const String _huggingFaceApiKey =
-      'token'; // Ganti dengan API key kamu (udah ada)
+      'a'; // Ganti dengan API key kamu (udah ada)
   static const String _huggingFaceEndpoint =
       'https://api-inference.huggingface.co/models/bert-base-uncased';
 

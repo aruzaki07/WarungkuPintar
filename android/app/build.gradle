@@ -41,8 +41,11 @@ android {
             signingConfig = signingConfigs.debug
         }
     }
+
+
 }
 
 flutter {
     source = "../.."
 }
+

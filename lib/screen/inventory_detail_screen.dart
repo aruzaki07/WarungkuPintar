@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:lottie/lottie.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:barcode_widget/barcode_widget.dart';
+import 'dart:ui' as ui;
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
 import '../provider/inventory_provider.dart';
 import '../model/item_model.dart';
 
@@ -23,6 +30,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
   String? _selectedCategory;
   String? _selectedUnit;
   bool _isLoading = false;
+  GlobalKey _barcodeKey = GlobalKey(); // Untuk capture barcode sebagai gambar
 
   final List<String> _categories = [
     'Sembako',
@@ -35,6 +43,90 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
 
   final List<String> _units = ['Liter (L)', 'Kilogram (kg)', 'Pcs/Buah'];
 
+  Future<void> _downloadBarcode() async {
+    try {
+      await Future.delayed(const Duration(milliseconds: 100));
+      final boundary = _barcodeKey.currentContext?.findRenderObject()
+          as RenderRepaintBoundary?;
+      if (boundary == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gagal menangkap gambar barcode')),
+        );
+        return;
+      }
+
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      final uint8List = byteData!.buffer.asUint8List();
+
+      final fileName =
+          'barcode_${widget.item.name}_${DateTime.now().millisecondsSinceEpoch}.png';
+
+      Directory directory;
+      if (Platform.isAndroid) {
+        if (Platform.version.split('.').first.compareTo('29') >= 0) {
+          final values = <String, dynamic>{
+            '_data': uint8List,
+            'relative_path': 'Pictures/UMKM Smart Assistant',
+            'title': fileName,
+            'mime_type': 'image/png',
+          };
+
+          const platform =
+              MethodChannel('com.example.umkm_smart_assistant/save_to_gallery');
+          final result = await platform.invokeMethod('saveImage', values);
+
+          if (result) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                  content: Text('Barcode berhasil disimpan ke galeri!')),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                  content: Text('Gagal menyimpan barcode ke galeri')),
+            );
+          }
+          return;
+        } else {
+          if (await Permission.storage.request().isGranted) {
+            directory =
+                Directory('/storage/emulated/0/Pictures/UMKM Smart Assistant');
+            if (!await directory.exists()) {
+              await directory.create(recursive: true);
+            }
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Izin penyimpanan ditolak')),
+            );
+            return;
+          }
+        }
+      } else {
+        directory = await getApplicationDocumentsDirectory();
+      }
+
+      final filePath = '${directory.path}/$fileName';
+      final file = File(filePath);
+      await file.writeAsBytes(uint8List);
+
+      if (Platform.isAndroid &&
+          Platform.version.split('.').first.compareTo('29') < 0) {
+        const platform =
+            MethodChannel('com.example.umkm_smart_assistant/save_to_gallery');
+        await platform.invokeMethod('scanFile', {'path': filePath});
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Barcode berhasil disimpan ke galeri!')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error saat mengunduh barcode: $e')),
+      );
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -45,17 +137,13 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
         TextEditingController(text: widget.item.buyPrice?.toString());
     _sellPriceController =
         TextEditingController(text: widget.item.sellPrice?.toString());
-
-    // Validasi kategori dan satuan agar sesuai dengan daftar
     _selectedCategory = _categories.contains(widget.item.category)
         ? widget.item.category
-        : _categories.firstWhere(
-            (category) => category == 'Lainnya',
-            orElse: () => _categories.first,
-          ); // Fallback ke "Lainnya" atau kategori pertama
-    _selectedUnit = _units.contains(widget.item.unit)
-        ? widget.item.unit
-        : _units.first; // Fallback ke satuan pertama
+        : _categories.firstWhere((category) => category == 'Lainnya',
+            orElse: () => _categories.first);
+    _selectedUnit =
+        _units.contains(widget.item.unit) ? widget.item.unit : _units.first;
+    print('Barcode: ${widget.item.barcode}'); // Debug barcode value
   }
 
   @override
@@ -82,9 +170,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
         return;
       }
 
-      setState(() {
-        _isLoading = true;
-      });
+      setState(() => _isLoading = true);
 
       final updatedItem = Item(
         docId: widget.item.docId,
@@ -111,9 +197,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
           SnackBar(content: Text('Error: $error')),
         );
       } finally {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
     }
   }
@@ -137,10 +221,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomCenter,
-                  colors: [
-                    Color(0xFFFFCA28),
-                    Color(0xFF4CAF50),
-                  ],
+                  colors: [Color(0xFFFFCA28), Color(0xFF4CAF50)],
                 ),
               ),
             ),
@@ -333,6 +414,68 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
                               fontStyle: FontStyle.italic,
                             ),
                           ),
+                          const SizedBox(height: 16),
+                          if (widget.item.barcode != null) ...[
+                            Text(
+                              'Barcode: ${widget.item.barcode}',
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            RepaintBoundary(
+                              key: _barcodeKey,
+                              child: Container(
+                                color: Colors.white,
+                                padding: const EdgeInsets.all(8.0),
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      widget.item.name!,
+                                      // Tulis nama item di atas QR Code
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    // Jarak antara nama dan QR Code
+                                    BarcodeWidget(
+                                      barcode: Barcode.qrCode(),
+                                      data: widget.item.barcode!,
+                                      // Data QR Code tetap barcode aja
+                                      width: 200,
+                                      height: 200,
+                                      drawText: true,
+                                      // Teks barcode muncul di bawah QR Code
+                                      backgroundColor: Colors.white,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            ElevatedButton(
+                              onPressed: _downloadBarcode,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFFCA28),
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 12, horizontal: 20),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10)),
+                              ),
+                              child: Text(
+                                'Unduh Barcode',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 24),
                           Center(
                             child: ElevatedButton(
@@ -344,8 +487,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
                                 padding: const EdgeInsets.symmetric(
                                     vertical: 14, horizontal: 24),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
+                                    borderRadius: BorderRadius.circular(10)),
                                 elevation: 4,
                               ),
                               child: _isLoading

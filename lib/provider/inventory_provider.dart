@@ -1,11 +1,10 @@
-// lib/provider/inventory_provider.dart
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../model/item_model.dart';
 import '../model/sale_model.dart';
 import '../services/firestore_service.dart';
-import '../services/ai_service.dart';
 import '../services/prediction_service.dart';
 
 class InventoryProvider with ChangeNotifier {
@@ -14,11 +13,16 @@ class InventoryProvider with ChangeNotifier {
   final FirestoreService _firestoreService = FirestoreService();
 
   List<Item> get items => _items;
-  List<Sale> get sales => _sales;
-  double get todaySales => _calculateTodaySales();
-  List<Item> get criticalStock => _items.where((item) => (item.quantity ?? 0) <= 5).toList();
 
-  Future<void> addItem(String name, int quantity, double buyPrice, double sellPrice, String category, String unit) async {
+  List<Sale> get sales => _sales;
+
+  double get todaySales => _calculateTodaySales();
+
+  List<Item> get criticalStock =>
+      _items.where((item) => (item.quantity ?? 0) <= 5).toList();
+
+  Future<void> addItem(String name, int quantity, double buyPrice,
+      double sellPrice, String category, String unit) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw Exception('User not logged in');
 
@@ -51,7 +55,8 @@ class InventoryProvider with ChangeNotifier {
     if (item.docId == null) throw Exception('Item ID not found');
 
     await _firestoreService.updateItem(userId, item);
-    final index = _items.indexWhere((existingItem) => existingItem.docId == item.docId);
+    final index =
+        _items.indexWhere((existingItem) => existingItem.docId == item.docId);
     if (index != -1) {
       final updatedItem = Item(
         docId: item.docId,
@@ -62,7 +67,8 @@ class InventoryProvider with ChangeNotifier {
         barcode: item.barcode,
         category: item.category,
         prediction: item.prediction,
-        stockPrediction: predictStockForItem(item), // Update prediksi stok
+        stockPrediction: predictStockForItem(item),
+        // Update prediksi stok
         imageUrl: item.imageUrl,
         unit: item.unit,
       );
@@ -116,7 +122,8 @@ class InventoryProvider with ChangeNotifier {
             imageUrl: item.imageUrl,
             unit: item.unit,
           );
-          if (!uniqueItems.any((existingItem) => existingItem.docId == updatedItem.docId)) {
+          if (!uniqueItems
+              .any((existingItem) => existingItem.docId == updatedItem.docId)) {
             uniqueItems.add(updatedItem);
           }
         }
@@ -167,16 +174,17 @@ class InventoryProvider with ChangeNotifier {
     final now = DateTime.now();
     return _sales
         .where((sale) =>
-    sale.date != null &&
-        sale.date!.day == now.day &&
-        sale.date!.month == now.month &&
-        sale.date!.year == now.year)
+            sale.date != null &&
+            sale.date!.day == now.day &&
+            sale.date!.month == now.month &&
+            sale.date!.year == now.year)
         .fold(0, (total, sale) => total + (sale.totalPrice ?? 0));
   }
 
-  Future<void> addSale(String itemName, int quantitySold, double totalPrice) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) throw Exception('User not logged in');
+  Future<void> addSale(
+      String itemName, int quantitySold, double totalPrice,String? ownerId) async {
+    final userId = ownerId ?? FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) throw Exception('User not logged in');
 
     final sale = Sale(
       itemName: itemName,
@@ -185,29 +193,43 @@ class InventoryProvider with ChangeNotifier {
       date: DateTime.now(),
     );
 
-    await _firestoreService.createSale(user.uid, sale);
+    // Simpan penjualan ke Firestore
+    await _firestoreService.createSale(userId, sale);
     _sales.add(sale);
-    final updatedItems = _items.map((item) {
-      if (item.name == itemName) {
-        return Item(
-          docId: item.docId,
-          name: item.name,
-          quantity: item.quantity! - quantitySold,
-          buyPrice: item.buyPrice,
-          sellPrice: item.sellPrice,
-          barcode: item.barcode,
-          category: item.category,
-          prediction: item.prediction,
-          stockPrediction: predictStockForItem(item),
-          imageUrl: item.imageUrl,
-          unit: item.unit,
-        );
+
+    // Cari item yang sesuai dan kurangi stok
+    final itemIndex = _items.indexWhere((item) => item.name == itemName);
+    if (itemIndex != -1) {
+      final item = _items[itemIndex];
+      if (item.quantity == null || item.quantity! < quantitySold) {
+        throw Exception('Stok tidak cukup! Sisa stok: ${item.quantity ?? 0}');
       }
-      return item;
-    }).toList();
-    _items.clear();
-    _items.addAll(updatedItems);
-    notifyListeners();
+
+      // Buat item baru dengan stok yang dikurangi
+      final updatedItem = Item(
+        docId: item.docId,
+        name: item.name,
+        quantity: item.quantity! - quantitySold,
+        buyPrice: item.buyPrice,
+        sellPrice: item.sellPrice,
+        barcode: item.barcode,
+        category: item.category,
+        prediction: item.prediction,
+        stockPrediction: predictStockForItem(item),
+        // Update prediksi
+        imageUrl: item.imageUrl,
+        unit: item.unit,
+      );
+
+      // Update item di Firestore
+      await _firestoreService.updateItem(userId, updatedItem);
+
+      // Update item di daftar lokal
+      _items[itemIndex] = updatedItem;
+      notifyListeners();
+    } else {
+      throw Exception('Item tidak ditemukan');
+    }
   }
 
   Future<void> deleteSale(String docId) async {
@@ -219,5 +241,62 @@ class InventoryProvider with ChangeNotifier {
     final saleToDelete = _sales.firstWhere((sale) => sale.docId == docId);
     _sales.removeWhere((sale) => sale.docId == docId);
     notifyListeners();
+  }
+
+  void loadItemsForOwner(String ownerId) {
+    _firestoreService.getItems(ownerId).listen((items) {
+      final uniqueItems = <Item>[];
+      for (final item in items) {
+        final updatedItem = Item(
+          docId: item.docId,
+          name: item.name,
+          quantity: item.quantity,
+          buyPrice: item.buyPrice,
+          sellPrice: item.sellPrice,
+          barcode: item.barcode,
+          category: item.category,
+          prediction: item.prediction,
+          stockPrediction: predictStockForItem(item),
+          imageUrl: item.imageUrl,
+          unit: item.unit,
+        );
+        if (!uniqueItems
+            .any((existingItem) => existingItem.docId == updatedItem.docId)) {
+          uniqueItems.add(updatedItem);
+        }
+      }
+      _items.clear();
+      _items.addAll(uniqueItems);
+      notifyListeners();
+    }, onError: (error) {
+      debugPrint('Error loading items: $error');
+    });
+  }
+
+  void loadSalesForOwner(String ownerId) {
+    _firestoreService.getSales(ownerId).listen((sales) {
+      _sales.clear();
+      _sales.addAll(sales);
+      final updatedItems = _items.map((item) {
+        return Item(
+          docId: item.docId,
+          name: item.name,
+          quantity: item.quantity,
+          buyPrice: item.buyPrice,
+          sellPrice: item.sellPrice,
+          barcode: item.barcode,
+          category: item.category,
+          prediction: item.prediction,
+          stockPrediction: predictStockForItem(item),
+          imageUrl: item.imageUrl,
+          unit: item.unit,
+        );
+      }).toList();
+      _items.clear();
+      _items.addAll(updatedItems);
+      notifyListeners();
+    }, onError: (error) {
+      debugPrint('Error loading sales: $error');
+    });
   }
 }
